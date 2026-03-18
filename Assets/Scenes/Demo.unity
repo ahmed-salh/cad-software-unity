@@ -670,6 +670,50 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 474780233}
   m_CullTransparentMesh: 1
+--- !u!1 &526615127
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 526615128}
+  - component: {fileID: 526615129}
+  m_Layer: 0
+  m_Name: CADFileManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &526615128
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526615127}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 4343.5527, y: -0.00002, z: 5959.2314}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1363390826}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &526615129
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526615127}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6718a97e01169643b1330deca1b262a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CADFileManager
 --- !u!1 &557447154
 GameObject:
   m_ObjectHideFlags: 0
@@ -2516,6 +2560,8 @@ Transform:
   - {fileID: 1811587036}
   - {fileID: 923017328}
   - {fileID: 168308629}
+  - {fileID: 526615128}
+  - {fileID: 1422859507}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1370626813
@@ -2550,6 +2596,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 357b996097973d543b52fdc0f5c4e1fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CADUI
+  btnNew: {fileID: 474780235}
+  btnOpen: {fileID: 854183212}
+  btnSave: {fileID: 0}
+  btnSaveAs: {fileID: 0}
+  btnImportMesh: {fileID: 854183212}
+  fileDialog: {fileID: 0}
+  unsavedDialog: {fileID: 0}
+  titleLabel: {fileID: 0}
   btnSelect: {fileID: 1359841174}
   btnBox: {fileID: 1634860054}
   btnCylinder: {fileID: 1318980474}
@@ -2771,6 +2825,50 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1422859506
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1422859507}
+  - component: {fileID: 1422859508}
+  m_Layer: 0
+  m_Name: MeshImportManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1422859507
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1422859506}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 602.3792, y: 1032.8347, z: -102.02661}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1363390826}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1422859508
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1422859506}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d916611e97e66c48a5b37fbd447eaee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeshImportManager
 --- !u!1 &1431390656
 GameObject:
   m_ObjectHideFlags: 0

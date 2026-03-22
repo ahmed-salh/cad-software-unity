@@ -1,24 +1,40 @@
 ﻿using System.IO;
-using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
-/// Full CADUI — includes File menu (New, Open .cadproj, Save, Save As)
-/// AND a separate "Import Mesh" button that opens a Windows file dialog
-/// to import .obj / .stl files directly into the scene.
+/// Full CADUI — now includes three gizmo-mode buttons (Move / Scale / Rotate)
+/// that control which gizmo is shown when an object is selected.
+///
+/// New Inspector slots:
+///   btnGizmoMove   — activates Move gizmo   (W shortcut)
+///   btnGizmoScale  — activates Scale gizmo  (R shortcut)
+///   btnGizmoRotate — activates Rotate gizmo (E shortcut)
+///
+/// The active button is visually highlighted using the activeButtonColor.
 /// </summary>
 public class CADUI : MonoBehaviour
 {
-    // ── File menu ──────────────────────────────────────────────────────────────
+    // ── Gizmo mode buttons ─────────────────────────────────────────────────────
+    [Header("Gizmo mode")]
+    public Button btnGizmoMove;
+    public Button btnGizmoScale;
+    public Button btnGizmoRotate;
+    [Tooltip("Background colour applied to the active gizmo button")]
+    public Color activeButtonColor = new(0.25f, 0.55f, 1.00f);
+    [Tooltip("Background colour for inactive gizmo buttons")]
+    public Color inactiveButtonColor = new(0.22f, 0.22f, 0.22f);
+
+    // ── File ──────────────────────────────────────────────────────────────────
     [Header("File operations")]
     public Button btnNew;
-    public Button btnOpen;       // opens .cadproj project file
+    public Button btnOpen;
     public Button btnSave;
     public Button btnSaveAs;
 
     [Header("Import (OBJ / STL)")]
-    [Tooltip("Clicking this opens the Windows file dialog to import a mesh file.")]
     public Button btnImportMesh;
 
     [Header("Dialogs")]
@@ -28,13 +44,12 @@ public class CADUI : MonoBehaviour
     [Header("Title bar")]
     public TMP_Text titleLabel;
 
-    // ── Toolbar ────────────────────────────────────────────────────────────────
+    // ── Toolbar ───────────────────────────────────────────────────────────────
     [Header("Mode buttons")]
     public Button btnSelect;
     public Button btnBox;
     public Button btnCylinder;
     public Button btnSphere;
-    public Button btnExtrude;
     public Button btnMeasure;
     public Button btnBoolUnion;
     public Button btnBoolSub;
@@ -54,29 +69,39 @@ public class CADUI : MonoBehaviour
     [Header("Status bar")]
     public TMP_Text statusLabel;
 
-    // ── Internal ───────────────────────────────────────────────────────────────
+    // ── Internal ──────────────────────────────────────────────────────────────
     private CADObject inspectedObject;
     private bool updatingFromCode;
 
-    // ── Unity lifecycle ────────────────────────────────────────────────────────
+    private Button[] gizmoBtns;
+
+    // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     void Start()
     {
+        // ── Gizmo mode ────────────────────────────────────────────────────────
+        gizmoBtns = new[] { btnGizmoMove, btnGizmoScale, btnGizmoRotate };
+
+        btnGizmoMove?.onClick.AddListener(() => SetGizmoMode(GizmoMode.Move));
+        btnGizmoScale?.onClick.AddListener(() => SetGizmoMode(GizmoMode.Scale));
+        btnGizmoRotate?.onClick.AddListener(() => SetGizmoMode(GizmoMode.Rotate));
+
+        if (GizmoController.Instance != null)
+            GizmoController.Instance.OnModeChanged += RefreshGizmoButtons;
+
+        RefreshGizmoButtons(GizmoController.Instance?.ActiveMode ?? GizmoMode.Move);
+
         // ── File ──────────────────────────────────────────────────────────────
         btnNew?.onClick.AddListener(OnNewClicked);
         btnOpen?.onClick.AddListener(OnOpenClicked);
         btnSave?.onClick.AddListener(OnSaveClicked);
         btnSaveAs?.onClick.AddListener(OnSaveAsClicked);
-
-        // ── Import Mesh ───────────────────────────────────────────────────────
         btnImportMesh?.onClick.AddListener(OnImportMeshClicked);
 
         if (MeshImportManager.Instance != null)
         {
             MeshImportManager.Instance.OnImportComplete += objs =>
-                SetStatus($"Imported {objs.Count} object(s) — " +
-                          (objs.Count > 0 ? objs[0].objectName : ""));
-
+                SetStatus($"Imported {objs.Count} object(s): {(objs.Count > 0 ? objs[0].objectName : "")}");
             MeshImportManager.Instance.OnImportError += msg =>
                 SetStatus($"Import error: {msg}");
         }
@@ -86,19 +111,19 @@ public class CADUI : MonoBehaviour
 
         btnBox?.onClick.AddListener(() =>
         {
-            var obj = ShapeFactory.Instance.CreateBox(DropPoint(), Vector3.one);
+            var obj = ShapeFactory.Instance.CreateBox(Vector3.zero, Vector3.one);
             if (obj != null) { CADManager.Instance.Select(obj); SetMode(CADMode.Select); }
         });
 
         btnCylinder?.onClick.AddListener(() =>
         {
-            var obj = ShapeFactory.Instance.CreateCylinder(DropPoint());
+            var obj = ShapeFactory.Instance.CreateCylinder(Vector3.zero);
             if (obj != null) { CADManager.Instance.Select(obj); SetMode(CADMode.Select); }
         });
 
         btnSphere?.onClick.AddListener(() =>
         {
-            var obj = ShapeFactory.Instance.CreateSphere(DropPoint());
+            var obj = ShapeFactory.Instance.CreateSphere(Vector3.zero);
             if (obj != null) { CADManager.Instance.Select(obj); SetMode(CADMode.Select); }
         });
 
@@ -136,7 +161,8 @@ public class CADUI : MonoBehaviour
         if (CADFileManager.Instance != null)
         {
             CADFileManager.Instance.OnSceneNameChanged += UpdateTitleBar;
-            CADFileManager.Instance.OnDirtyChanged += _ => UpdateTitleBar(CADFileManager.Instance.CurrentSceneName);
+            CADFileManager.Instance.OnDirtyChanged +=
+                _ => UpdateTitleBar(CADFileManager.Instance.CurrentSceneName);
             CADFileManager.Instance.OnStatusMessage += SetStatus;
         }
 
@@ -144,10 +170,55 @@ public class CADUI : MonoBehaviour
         UpdateTitleBar("Untitled");
     }
 
+    void Update()
+    {
+        // ── Gizmo keyboard shortcuts (W / E / R — standard 3D software convention) ──
+        if (Keyboard.current == null) return;
+        if (Keyboard.current.wKey.wasPressedThisFrame) SetGizmoMode(GizmoMode.Move);
+        if (Keyboard.current.eKey.wasPressedThisFrame) SetGizmoMode(GizmoMode.Rotate);
+        if (Keyboard.current.rKey.wasPressedThisFrame) SetGizmoMode(GizmoMode.Scale);
+
+        // ── File shortcuts ────────────────────────────────────────────────────
+        if (Keyboard.current.ctrlKey.isPressed)
+        {
+            if (Keyboard.current.sKey.wasPressedThisFrame)
+            {
+                if (Keyboard.current.shiftKey.isPressed) OnSaveAsClicked();
+                else OnSaveClicked();
+            }
+            if (Keyboard.current.nKey.wasPressedThisFrame) OnNewClicked();
+            if (Keyboard.current.oKey.wasPressedThisFrame) OnOpenClicked();
+        }
+    }
+
     void OnDestroy()
     {
         if (CADManager.Instance != null)
             CADManager.Instance.OnSelectionChanged -= RefreshProperties;
+        if (GizmoController.Instance != null)
+            GizmoController.Instance.OnModeChanged -= RefreshGizmoButtons;
+    }
+
+    // ── Gizmo mode ─────────────────────────────────────────────────────────────
+
+    private void SetGizmoMode(GizmoMode mode)
+    {
+        GizmoController.Instance?.SetMode(mode);
+        SetStatus($"Gizmo: {mode}");
+    }
+
+    private void RefreshGizmoButtons(GizmoMode active)
+    {
+        Button[] btns = { btnGizmoMove, btnGizmoScale, btnGizmoRotate };
+        GizmoMode[] modes = { GizmoMode.Move, GizmoMode.Scale, GizmoMode.Rotate };
+
+        for (int i = 0; i < btns.Length; i++)
+        {
+            if (btns[i] == null) continue;
+            var img = btns[i].GetComponent<Image>();
+            if (img != null)
+                img.color = (modes[i] == active) ? activeButtonColor : inactiveButtonColor;
+        }
     }
 
     // ── Import mesh ────────────────────────────────────────────────────────────
@@ -155,17 +226,17 @@ public class CADUI : MonoBehaviour
     private void OnImportMeshClicked()
     {
         SetStatus("Opening file dialog…");
-        MeshImportManager.Instance.OpenAndImport();
+        MeshImportManager.Instance?.OpenAndImport();
     }
 
-    // ── File operations ────────────────────────────────────────────────────────
+    // ── File ───────────────────────────────────────────────────────────────────
 
     private void OnNewClicked()
     {
         if (CADFileManager.Instance.IsDirty)
             ShowUnsavedDialog("New Scene",
-                saveAction: () => { CADFileManager.Instance.Save(); CADFileManager.Instance.NewScene(); },
-                discardAction: () => CADFileManager.Instance.NewScene());
+                () => { CADFileManager.Instance.Save(); CADFileManager.Instance.NewScene(); },
+                () => CADFileManager.Instance.NewScene());
         else
             CADFileManager.Instance.NewScene();
     }
@@ -174,8 +245,8 @@ public class CADUI : MonoBehaviour
     {
         if (CADFileManager.Instance.IsDirty)
             ShowUnsavedDialog("Open File",
-                saveAction: () => { CADFileManager.Instance.Save(); ShowOpenDialog(); },
-                discardAction: ShowOpenDialog);
+                () => { CADFileManager.Instance.Save(); ShowOpenDialog(); },
+                ShowOpenDialog);
         else
             ShowOpenDialog();
     }
@@ -195,12 +266,12 @@ public class CADUI : MonoBehaviour
             string fallback = Path.Combine(
                 Application.persistentDataPath,
                 CADFileManager.Instance.CurrentSceneName + "_" +
-                System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + "." + CADFileManager.FILE_EXT);
+                System.DateTime.Now.ToString("yyyyMMdd_HHmmss") +
+                "." + CADFileManager.FILE_EXT);
             CADFileManager.Instance.SaveAs(fallback);
             return;
         }
-        fileDialog.ShowSave(
-            CADFileManager.Instance.CurrentSceneName,
+        fileDialog.ShowSave(CADFileManager.Instance.CurrentSceneName,
             path => CADFileManager.Instance.SaveAs(path));
     }
 
@@ -210,21 +281,20 @@ public class CADUI : MonoBehaviour
         fileDialog.ShowOpen(path => CADFileManager.Instance.Open(path));
     }
 
-    private void ShowUnsavedDialog(string context,
-        System.Action saveAction, System.Action discardAction)
+    private void ShowUnsavedDialog(string ctx,
+        System.Action save, System.Action discard)
     {
-        if (unsavedDialog == null) { discardAction?.Invoke(); return; }
-        unsavedDialog.Show($"You have unsaved changes.\nSave before {context}?",
-            saveAction, discardAction);
+        if (unsavedDialog == null) { discard?.Invoke(); return; }
+        unsavedDialog.Show($"You have unsaved changes.\nSave before {ctx}?", save, discard);
     }
 
     // ── Title bar ──────────────────────────────────────────────────────────────
 
-    private void UpdateTitleBar(string sceneName)
+    private void UpdateTitleBar(string name)
     {
         if (titleLabel == null) return;
         bool dirty = CADFileManager.Instance != null && CADFileManager.Instance.IsDirty;
-        titleLabel.text = $"{sceneName}{(dirty ? " *" : "")}  —  Unity CAD";
+        titleLabel.text = $"{name}{(dirty ? " *" : "")}  —  Unity CAD";
     }
 
     // ── Mode ───────────────────────────────────────────────────────────────────
@@ -233,11 +303,11 @@ public class CADUI : MonoBehaviour
 
     private Vector3 DropPoint()
     {
-        var cam = Camera.main;
-        return cam != null ? cam.transform.position + cam.transform.forward * 5f : Vector3.zero;
+        var c = Camera.main;
+        return c != null ? c.transform.position + c.transform.forward * 5f : Vector3.zero;
     }
 
-    // ── Properties panel ───────────────────────────────────────────────────────
+    // ── Properties ─────────────────────────────────────────────────────────────
 
     private void RefreshProperties(CADObject obj)
     {
@@ -247,10 +317,10 @@ public class CADUI : MonoBehaviour
 
         updatingFromCode = true;
         var s = obj.transform.localScale;
-        if (inputW != null) inputW.text = s.x.ToString("F3");
-        if (inputH != null) inputH.text = s.y.ToString("F3");
-        if (inputD != null) inputD.text = s.z.ToString("F3");
-        if (objectNameLabel != null) objectNameLabel.text = obj.objectName;
+        if (inputW) inputW.text = s.x.ToString("F3");
+        if (inputH) inputH.text = s.y.ToString("F3");
+        if (inputD) inputD.text = s.z.ToString("F3");
+        if (objectNameLabel) objectNameLabel.text = obj.objectName;
         updatingFromCode = false;
     }
 
@@ -283,7 +353,7 @@ public class CADUI : MonoBehaviour
 
     private void SetStatus(string msg)
     {
-        if (statusLabel != null) statusLabel.text = msg;
+        if (statusLabel) statusLabel.text = msg;
         Debug.Log("[CADUI] " + msg);
     }
 }
